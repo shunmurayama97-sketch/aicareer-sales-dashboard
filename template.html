@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AICAREER｜営業管理ダッシュボード</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Montserrat:wght@700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#6B4FBB',
+            'grad-from': '#7B5FCC',
+            'grad-to': '#E06ACA',
+            'dark-from': '#1A1464',
+            'dark-to': '#6B35C8',
+          },
+          fontFamily: {
+            sans: ['Noto Sans JP', 'sans-serif'],
+            heading: ['Montserrat', 'Inter', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #6B4FBB;
+      --grad-main: linear-gradient(135deg, #7B5FCC, #E06ACA);
+      --grad-dark: linear-gradient(135deg, #1A1464, #6B35C8);
+      --grad-soft: linear-gradient(135deg, #A78BCC, #E8AADD);
+    }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      color: #fff;
+      background: linear-gradient(135deg, #0D0B2E 0%, #1A1464 40%, #2D1B69 100%);
+      min-height: 100vh;
+    }
+    .section-label {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #E06ACA;
+    }
+    .kpi-card {
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 24px 28px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(107, 79, 187, 0.25);
+    }
+    .kpi-value {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 40px;
+      font-weight: 800;
+      background: var(--grad-main);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+    }
+    .chart-card {
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 24px 28px;
+    }
+    .funnel-bar {
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-weight: 700;
+      font-size: 13px;
+      transition: opacity 0.2s;
+      min-width: 180px;
+      white-space: nowrap;
+    }
+    .funnel-bar:hover { opacity: 0.85; }
+    .funnel-count {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      margin-left: auto;
+    }
+    .data-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .data-table thead th {
+      background: rgba(107, 79, 187, 0.2);
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.7);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .data-table thead th:first-child { border-radius: 12px 0 0 0; }
+    .data-table thead th:last-child { border-radius: 0 12px 0 0; }
+    .data-table tbody tr { transition: background 0.15s; cursor: pointer; }
+    .data-table tbody tr:hover { background: rgba(107, 79, 187, 0.12); }
+    .data-table tbody td {
+      padding: 10px 14px;
+      font-size: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.85);
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 50px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+    .badge-未接触 { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
+    .badge-リサーチ中 { background: rgba(107,79,187,0.25); color: #C4B5E8; }
+    .badge-初回接触済み { background: rgba(123,95,204,0.3); color: #B8A5E8; }
+    .badge-商談中 { background: rgba(224,106,202,0.25); color: #E8A5D8; }
+    .badge-提案済み { background: rgba(224,106,202,0.35); color: #F0C0E8; }
+    .badge-受注 { background: rgba(107,187,130,0.25); color: #A5E8B8; }
+    .badge-失注 { background: rgba(187,107,107,0.25); color: #E8A5A5; }
+    .badge-保留 { background: rgba(187,170,107,0.25); color: #E8DDA5; }
+    .badge-未取得 { background: rgba(255,165,0,0.15); color: #FFB366; }
+    .badge-p-高 { background: rgba(224,106,130,0.25); color: #F0A5B5; }
+    .badge-p-中 { background: rgba(224,180,106,0.2); color: #E8D0A5; }
+    .badge-p-低 { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); }
+    .filter-btn {
+      padding: 5px 14px;
+      border-radius: 50px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: transparent;
+      color: rgba(255,255,255,0.6);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover, .filter-btn.active {
+      background: rgba(107,79,187,0.3);
+      border-color: rgba(107,79,187,0.5);
+      color: #fff;
+    }
+    .search-input {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 50px;
+      padding: 8px 20px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+      width: 280px;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus { border-color: rgba(107,79,187,0.6); }
+    .search-input::placeholder { color: rgba(255,255,255,0.3); }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(107,79,187,0.3); border-radius: 3px; }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(107,79,187,0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(107,79,187,0); }
+    }
+    .pulse { animation: pulse-glow 2s infinite; }
+    .partial-row { opacity: 0.55; }
+  </style>
+</head>
+<body class="p-6 lg:p-10">
+
+  <!-- ヘッダー -->
+  <header class="flex items-center justify-between mb-8">
+    <div>
+      <div class="flex items-center gap-3 mb-1">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: var(--grad-main);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <h1 class="font-heading text-2xl font-bold tracking-wide">SALES DASHBOARD</h1>
+      </div>
+      <p class="text-xs" style="color: rgba(255,255,255,0.4);">AICAREER Co., Ltd. — 営業管理 Notion DB</p>
+    </div>
+    <div class="text-right">
+      <p class="text-xs" style="color: rgba(255,255,255,0.4);">最終同期</p>
+      <p class="text-base font-bold font-heading" id="lastUpdate"></p>
+      <p class="text-xs mt-1" style="color:rgba(255,255,255,0.3);"><span id="fetchedCount">0</span> / 828件（全件取得完了）</p>
+    </div>
+  </header>
+
+  <!-- KPIサマリー -->
+  <section class="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
+    <div class="kpi-card" id="kpi-total">
+      <p class="section-label mb-1">TOTAL</p>
+      <p class="kpi-value" id="kv-total">-</p>
+      <p class="text-xs mt-1" style="color:rgba(255,255,255,0.4);">取得済みリード</p>
+    </div>
+    <div class="kpi-card">
+      <p class="section-label mb-1">PIPELINE</p>
+      <p class="kpi-value" id="kv-pipeline">-</p>
+      <p class="text-xs mt-1" style="color:rgba(255,255,255,0.4);">リサーチ中＋接触以降</p>
+    </div>
+    <div class="kpi-card">
+      <p class="section-label mb-1">EMAIL READY</p>
+      <p class="kpi-value" id="kv-email">-</p>
+      <p class="text-xs mt-1" style="color:rgba(255,255,255,0.4);">メールアドレス保有</p>
+    </div>
+    <div class="kpi-card">
+      <p class="section-label mb-1">LOST</p>
+      <p class="kpi-value" id="kv-lost">-</p>
+      <p class="text-xs mt-1" style="color:rgba(255,255,255,0.4);">失注</p>
+    </div>
+    <div class="kpi-card" style="border: 1px solid rgba(224,106,202,0.3);">
+      <p class="section-label mb-1">LINK CLICK</p>
+      <p class="kpi-value" id="kv-linkclick">-</p>
+      <p class="text-xs mt-1" style="color:rgba(255,255,255,0.4);">日程予約リンク遷移</p>
+    </div>
+    <div class="kpi-card pulse">
+      <p class="section-label mb-1">CONVERSION</p>
+      <p class="kpi-value" id="kv-conv">-</p>
+      <p class="text-xs mt-1" style="color:rgba(255,255,255,0.4);">初回接触以降の転換率</p>
+    </div>
+  </section>
+
+  <!-- チャートエリア -->
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+    <!-- ファネル -->
+    <div class="chart-card">
+      <p class="section-label mb-1">PIPELINE FUNNEL</p>
+      <h2 class="text-base font-bold mb-4">パイプラインファネル</h2>
+      <div class="space-y-2" id="funnelArea"></div>
+    </div>
+    <!-- 業種別 -->
+    <div class="chart-card">
+      <p class="section-label mb-1">INDUSTRY</p>
+      <h2 class="text-base font-bold mb-4">業種別分布</h2>
+      <div style="position:relative;height:260px;"><canvas id="industryChart"></canvas></div>
+    </div>
+    <!-- 優先度 -->
+    <div class="chart-card">
+      <p class="section-label mb-1">PRIORITY</p>
+      <h2 class="text-base font-bold mb-4">優先度別ステータス</h2>
+      <div style="position:relative;height:260px;"><canvas id="priorityChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- アクション＋ゴール -->
+  <section class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+    <div class="chart-card">
+      <p class="section-label mb-1">ACTION REQUIRED</p>
+      <h2 class="text-base font-bold mb-3">今すぐ対応が必要</h2>
+      <div id="actionArea" class="space-y-3"></div>
+    </div>
+    <div class="chart-card lg:col-span-2">
+      <p class="section-label mb-1">GOAL TRACKING</p>
+      <h2 class="text-base font-bold mb-4">退職ゲート進捗</h2>
+      <div class="grid grid-cols-2 gap-6">
+        <div>
+          <p class="text-xs mb-2" style="color:rgba(255,255,255,0.5);">MRR目標: 250万円</p>
+          <div class="w-full h-3 rounded-full mb-1" style="background:rgba(255,255,255,0.1);"><div class="h-3 rounded-full" style="background:var(--grad-main);width:0%;"></div></div>
+          <p class="text-xs" style="color:rgba(255,255,255,0.35);">受注0件 — まずは3社受注が目標</p>
+        </div>
+        <div>
+          <p class="text-xs mb-2" style="color:rgba(255,255,255,0.5);">4月目標: 3社受注（70〜90万円）</p>
+          <div class="w-full h-3 rounded-full mb-1" style="background:rgba(255,255,255,0.1);"><div class="h-3 rounded-full" style="background:var(--grad-main);width:0%;"></div></div>
+          <p class="text-xs" style="color:rgba(255,255,255,0.35);">受注: 0/3社</p>
+        </div>
+      </div>
+      <div class="mt-6 grid grid-cols-4 gap-3" id="summaryCards"></div>
+    </div>
+  </section>
+
+  <!-- 企業一覧 -->
+  <section class="chart-card mb-8">
+    <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <div>
+        <p class="section-label mb-1">LEAD LIST</p>
+        <h2 class="text-base font-bold">企業一覧 <span id="tableCount" class="text-xs font-normal" style="color:rgba(255,255,255,0.4);"></span></h2>
+      </div>
+      <div class="flex items-center gap-3 flex-wrap">
+        <input type="text" class="search-input" id="searchInput" placeholder="企業名で検索...">
+        <div class="flex gap-2 flex-wrap" id="filterBtns"></div>
+      </div>
+    </div>
+    <div class="overflow-x-auto" style="max-height:520px;overflow-y:auto;">
+      <table class="data-table" id="leadTable">
+        <thead>
+          <tr>
+            <th style="min-width:180px;">会社名</th>
+            <th>ステータス</th>
+            <th>優先度</th>
+            <th>業種</th>
+            <th style="min-width:140px;">担当者</th>
+            <th>メール</th>
+            <th>概要</th>
+          </tr>
+        </thead>
+        <tbody id="leadTableBody"></tbody>
+      </table>
+    </div>
+    <div class="flex items-center justify-between mt-3">
+      <p class="text-xs" style="color:rgba(255,255,255,0.35);" id="showingCount"></p>
+      <button id="loadMoreBtn" class="filter-btn" style="display:none;">もっと表示</button>
+    </div>
+  </section>
+
+  <footer class="text-center py-4" style="color:rgba(255,255,255,0.2);">
+    <p class="text-xs">AICAREER Co., Ltd. — Sales Dashboard — Powered by Notion</p>
+  </footer>
+
+<script>
+// ── データ ──
+const companies = __DASHBOARD_DATA__;
+
+// ── 初期化 ──
+document.getElementById('lastUpdate').textContent = new Date().toLocaleDateString('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit'});
+document.getElementById('fetchedCount').textContent = companies.length;
+
+// ── 集計 ──
+const full = companies.filter(c => c.full);
+const statuses = {};
+const priorities = {};
+const industries = {};
+companies.forEach(c => {
+  statuses[c.s] = (statuses[c.s]||0) + 1;
+  if (c.p) priorities[c.p] = (priorities[c.p]||0) + 1;
+  if (c.i) industries[c.i] = (industries[c.i]||0) + 1;
+});
+
+const pipeline = (statuses['リサーチ中']||0) + (statuses['初回接触済み']||0) + (statuses['商談中']||0) + (statuses['提案済み']||0);
+const emailCount = companies.filter(c => c.email).length;
+const lost = statuses['失注']||0;
+const contacted = (statuses['初回接触済み']||0) + (statuses['商談中']||0) + (statuses['提案済み']||0) + (statuses['受注']||0);
+const convRate = full.length > 0 ? ((contacted / full.length) * 100).toFixed(1) + '%' : '0%';
+
+// KPI
+document.getElementById('kv-total').textContent = companies.length.toLocaleString();
+document.getElementById('kv-pipeline').textContent = pipeline;
+document.getElementById('kv-email').textContent = emailCount;
+document.getElementById('kv-lost').textContent = lost;
+document.getElementById('kv-conv').textContent = convRate;
+
+// リンククリック（日程予約遷移）
+const linkClicked = companies.filter(c => c.linkClick);
+document.getElementById('kv-linkclick').textContent = linkClicked.length;
+
+// ── ファネル ──
+const funnelSteps = [
+  {label:'未接触', count: statuses['未接触']||0, bg:'rgba(255,255,255,0.08)'},
+  {label:'リサーチ中', count: statuses['リサーチ中']||0, bg:'rgba(107,79,187,0.35)'},
+  {label:'初回接触済み', count: statuses['初回接触済み']||0, bg:'rgba(123,95,204,0.5)'},
+  {label:'日程調整クリック', count: linkClicked.length, bg:'rgba(180,90,210,0.45)'},
+  {label:'商談中', count: statuses['商談中']||0, bg:'rgba(224,106,202,0.4)'},
+  {label:'提案済み', count: statuses['提案済み']||0, bg:'rgba(224,106,202,0.55)'},
+  {label:'受注', count: statuses['受注']||0, bg:'var(--grad-main)'},
+];
+const maxFunnel = Math.max(...funnelSteps.map(s=>s.count), 1);
+const funnelArea = document.getElementById('funnelArea');
+funnelSteps.forEach(s => {
+  const w = Math.max(s.count / maxFunnel * 100, 22);
+  funnelArea.innerHTML += `<div class="funnel-bar" style="background:${s.bg};width:${w}%;">
+    <span>${s.label}</span>
+    <span class="funnel-count">${s.count}</span>
+  </div>`;
+});
+if (statuses['失注']) {
+  funnelArea.innerHTML += `<div class="mt-2 p-3 rounded-xl" style="background:rgba(187,107,107,0.1);border:1px solid rgba(187,107,107,0.2);">
+    <p class="text-xs" style="color:#E8A5A5;">失注: ${statuses['失注']}件</p></div>`;
+}
+if (statuses['未取得']) {
+  funnelArea.innerHTML += `<div class="mt-2 p-3 rounded-xl" style="background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.15);">
+    <p class="text-xs" style="color:#FFB366;">API未取得: ${statuses['未取得']}件（名前のみ）</p></div>`;
+}
+
+// ── アクション ──
+const actionArea = document.getElementById('actionArea');
+// 接触済みで放置
+const stale = full.filter(c => c.s === '初回接触済み' && c.lc);
+stale.forEach(c => {
+  actionArea.innerHTML += `<div class="p-3 rounded-xl" style="background:rgba(107,79,187,0.15);border:1px solid rgba(107,79,187,0.25);">
+    <div class="flex items-center justify-between mb-1">
+      <span class="font-bold text-xs">${c.n}</span>
+      <span class="badge badge-初回接触済み">初回接触済み</span>
+    </div>
+    <p class="text-xs" style="color:rgba(255,255,255,0.4);">最終接触: ${c.lc}</p>
+    <p class="text-xs mt-1" style="color:#E06ACA;">→ 再アプローチを推奨</p>
+  </div>`;
+});
+
+// リサーチ完了分
+const research = full.filter(c => c.s === 'リサーチ中');
+if (research.length > 0) {
+  const names = research.slice(0, 3).map(c => `<span class="text-xs px-2 py-1 rounded-full" style="background:rgba(107,79,187,0.2);">${c.n}</span>`);
+  actionArea.innerHTML += `<div class="p-3 rounded-xl" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);">
+    <p class="text-xs font-bold mb-2">リサーチ完了: ${research.length}社</p>
+    <p class="text-xs mb-2" style="color:rgba(255,255,255,0.4);">初回アプローチの準備を。</p>
+    <div class="flex flex-wrap gap-1">${names.join('')}${research.length > 3 ? `<span class="text-xs px-2 py-1 rounded-full" style="background:rgba(107,79,187,0.2);">+${research.length-3}社</span>` : ''}</div>
+  </div>`;
+}
+
+// リンククリック（日程予約遷移）企業
+if (linkClicked.length > 0) {
+  const lcNames = linkClicked.map(c => {
+    const d = new Date(c.linkClick);
+    const dateStr = d.toLocaleDateString('ja-JP', {month:'numeric',day:'numeric'});
+    return '<div class="flex items-center justify-between py-1"><span class="text-xs">' + c.n + '</span><span class="text-xs" style="color:rgba(255,255,255,0.4);">' + dateStr + '</span></div>';
+  }).join('');
+  actionArea.innerHTML += '<div class="p-3 rounded-xl" style="background:rgba(224,106,202,0.12);border:1px solid rgba(224,106,202,0.25);"><p class="text-xs font-bold mb-2" style="color:#E06ACA;">🔗 日程予約リンク遷移: ' + linkClicked.length + '社</p><div style="max-height:120px;overflow-y:auto;">' + lcNames + '</div></div>';
+}
+
+// 未接触のメール有
+const untouchedEmail = full.filter(c => c.s === '未接触' && c.email);
+if (untouchedEmail.length > 0) {
+  actionArea.innerHTML += `<div class="p-3 rounded-xl" style="background:rgba(224,106,202,0.08);border:1px solid rgba(224,106,202,0.15);">
+    <p class="text-xs font-bold" style="color:#E06ACA;">📧 未接触×メール有: ${untouchedEmail.length}社</p>
+    <p class="text-xs mt-1" style="color:rgba(255,255,255,0.4);">メール配信の即時対象候補</p>
+  </div>`;
+}
+
+// ── サマリーカード ──
+const summaryCards = document.getElementById('summaryCards');
+const summaryData = [
+  {val: full.length, label: '詳細取得済', color: '#7B5FCC'},
+  {val: statuses['リサーチ中']||0, label: 'リサーチ中', color: '#9B7FDC'},
+  {val: statuses['初回接触済み']||0, label: '接触済み', color: '#C06ACC'},
+  {val: statuses['受注']||0, label: '商談/受注', color: '#E06ACA'},
+];
+summaryData.forEach(s => {
+  summaryCards.innerHTML += `<div class="text-center p-3 rounded-xl" style="background:rgba(255,255,255,0.04);">
+    <p class="font-heading text-xl font-bold" style="color:${s.color};">${s.val}</p>
+    <p class="text-xs mt-1" style="color:rgba(255,255,255,0.4);">${s.label}</p>
+  </div>`;
+});
+
+// ── 業種チャート ──
+const indSorted = Object.entries(industries).sort((a,b)=>b[1]-a[1]);
+const indLabels = indSorted.slice(0, 6).map(e=>e[0]);
+const indData = indSorted.slice(0, 6).map(e=>e[1]);
+const otherCount = indSorted.slice(6).reduce((s,e)=>s+e[1], 0);
+if (otherCount > 0) { indLabels.push('その他'); indData.push(otherCount); }
+
+new Chart(document.getElementById('industryChart').getContext('2d'), {
+  type: 'doughnut',
+  data: {
+    labels: indLabels,
+    datasets: [{
+      data: indData,
+      backgroundColor: [
+        'rgba(107,79,187,0.85)', 'rgba(224,106,202,0.85)', 'rgba(123,95,204,0.85)',
+        'rgba(167,139,204,0.7)', 'rgba(232,170,221,0.7)', 'rgba(107,79,187,0.4)',
+        'rgba(255,255,255,0.15)',
+      ],
+      borderColor: 'transparent', borderWidth: 0,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, cutout: '65%',
+    plugins: { legend: { position: 'bottom', labels: { color: 'rgba(255,255,255,0.6)', font: {family:'Noto Sans JP', size:10}, padding:8, usePointStyle:true, pointStyleWidth:8 }}}
+  }
+});
+
+// ── 優先度チャート ──
+const prioStatuses = ['未接触','リサーチ中','接触済み','失注'];
+const prioData = {};
+['高','中','低','未設定'].forEach(p => { prioData[p] = [0,0,0,0]; });
+full.forEach(c => {
+  const p = c.p || '未設定';
+  const si = c.s === '未接触' ? 0 : c.s === 'リサーチ中' ? 1 : c.s === '失注' ? 3 : 2;
+  if (prioData[p]) prioData[p][si]++;
+});
+
+new Chart(document.getElementById('priorityChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: prioStatuses,
+    datasets: [
+      {label:'高', data: prioData['高'], backgroundColor:'rgba(224,106,130,0.7)', borderRadius:6},
+      {label:'中', data: prioData['中'], backgroundColor:'rgba(107,79,187,0.7)', borderRadius:6},
+      {label:'低', data: prioData['低'], backgroundColor:'rgba(224,106,202,0.5)', borderRadius:6},
+      {label:'未設定', data: prioData['未設定'], backgroundColor:'rgba(255,255,255,0.12)', borderRadius:6},
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    scales: {
+      x: {stacked:true, grid:{display:false}, ticks:{color:'rgba(255,255,255,0.5)',font:{family:'Noto Sans JP',size:10}}, border:{color:'rgba(255,255,255,0.1)'}},
+      y: {stacked:true, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'rgba(255,255,255,0.5)',font:{family:'Noto Sans JP',size:10}}, border:{display:false}},
+    },
+    plugins: { legend: { position:'bottom', labels: {color:'rgba(255,255,255,0.6)',font:{family:'Noto Sans JP',size:10},padding:8,usePointStyle:true,pointStyleWidth:8}}}
+  }
+});
+
+// ── フィルターボタン ──
+const filters = [
+  {id:'all', label:`すべて (${companies.length})`},
+  {id:'full', label:`詳細有 (${full.length})`},
+  {id:'未接触', label:`未接触 (${statuses['未接触']||0})`},
+  {id:'リサーチ中', label:`リサーチ中 (${statuses['リサーチ中']||0})`},
+  {id:'has-email', label:`メール有 (${emailCount})`},
+  {id:'失注', label:`失注 (${lost})`},
+  {id:'link-click', label:`リンク遷移 (${linkClicked.length})`},
+  {id:'未取得', label:`未取得 (${statuses['未取得']||0})`},
+];
+const filterBtns = document.getElementById('filterBtns');
+filters.forEach((f, i) => {
+  filterBtns.innerHTML += `<button class="filter-btn ${i===0?'active':''}" onclick="applyFilter('${f.id}', this)">${f.label}</button>`;
+});
+
+// ── テーブル描画 ──
+let currentData = companies;
+const PAGE = 100;
+let page = 0;
+
+function renderTable(data, reset) {
+  if (reset) { page = 0; currentData = data; }
+  const start = page * PAGE;
+  const slice = data.slice(start, start + PAGE);
+  const tbody = document.getElementById('leadTableBody');
+  if (page === 0) tbody.innerHTML = '';
+  
+  tbody.innerHTML += slice.map(c => {
+    const cls = c.full ? '' : 'partial-row';
+    const notionSearch = 'https://www.notion.so/search?q=' + encodeURIComponent(c.n);
+    const notionLink = c.notionUrl || notionSearch;
+    const nameLink = `<a href="${notionLink}" target="_blank" style="color:#C4B5E8;text-decoration:none;border-bottom:1px dotted rgba(196,181,232,0.3);" onclick="event.stopPropagation()">${c.n}</a>`;
+    return `<tr class="${cls}" style="cursor:pointer;" onclick="window.open('${notionLink}','_blank')">
+      <td class="font-medium">${nameLink}</td>
+      <td><span class="badge badge-${c.s}">${c.s}</span></td>
+      <td>${c.p ? `<span class="badge badge-p-${c.p}">${c.p}</span>` : '<span style="color:rgba(255,255,255,0.2);font-size:10px;">-</span>'}</td>
+      <td class="text-xs">${c.i || '-'}</td>
+      <td class="text-xs">${c.cp || '-'}</td>
+      <td class="text-xs">${c.email ? `<a href="mailto:${c.email}" style="color:#9B7FDC;text-decoration:none;" onclick="event.stopPropagation()">${c.email}</a>` : '-'}</td>
+      <td class="text-xs" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(c.biko||'').replace(/"/g,'&quot;')}">${c.biko || '-'}</td>
+    </tr>`;
+  }).join('');
+  
+  const shown = Math.min((page+1)*PAGE, data.length);
+  document.getElementById('tableCount').textContent = `（${data.length}社）`;
+  document.getElementById('showingCount').textContent = `${shown} / ${data.length}社 表示中`;
+  
+  const btn = document.getElementById('loadMoreBtn');
+  if (shown < data.length) {
+    btn.style.display = 'block';
+    btn.textContent = `次の${Math.min(PAGE, data.length - shown)}件を表示`;
+    btn.onclick = () => { page++; renderTable(data, false); };
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function applyFilter(id, el) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  let filtered;
+  if (id === 'all') filtered = companies;
+  else if (id === 'full') filtered = companies.filter(c => c.full);
+  else if (id === 'has-email') filtered = companies.filter(c => c.email);
+  else if (id === 'link-click') filtered = companies.filter(c => c.linkClick);
+  else filtered = companies.filter(c => c.s === id);
+  renderTable(filtered, true);
+}
+
+// ── 検索 ──
+document.getElementById('searchInput').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  if (!q) { renderTable(currentData, true); return; }
+  const filtered = companies.filter(c => c.n.toLowerCase().includes(q) || (c.biko||'').toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q));
+  renderTable(filtered, true);
+});
+
+renderTable(companies, true);
+</script>
+</body>
+</html>
