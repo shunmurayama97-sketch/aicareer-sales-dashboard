@@ -1,0 +1,8 @@
+# ログ・作業ファイル（コミット不要）
+*.log
+.sync_work/
+.DS_Store
+
+# 旧Notion→Sheets同期スクリプト（廃止済み・Notion一本化）
+sync_notion_to_sheets.py
+sync.sh

@@ -1,6 +1,12 @@
-name: Deploy to GitHub Pages
+name: Build from Notion & Deploy to Pages
 
 on:
+  # 1時間ごとに自動更新（Notion DB → ダッシュボード）
+  schedule:
+    - cron: "0 * * * *"
+  # 手動実行
+  workflow_dispatch:
+  # main への push でも即デプロイ（テンプレ変更時など）
   push:
     branches: [main]
 
@@ -14,16 +20,31 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build-and-deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Build dashboard from Notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: python build.py
+
       - uses: actions/configure-pages@v5
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: "."
+
       - id: deployment
         uses: actions/deploy-pages@v4
